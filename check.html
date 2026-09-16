@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Lyn 영문 공지 검증</title>
+<style>
+  /* Base Style & Reset */
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --bg-color: #f4f5f7;
+    --box-bg: #ffffff;
+    --border: #d1d5db;
+    --text-main: #1f2937;
+    --text-sub: #4b5563;
+    --err-bg: #fef2f2;
+    --err-text: #991b1b;
+    --err-border: #ef4444;
+    --success-bg: #f0fdf4;
+    --success-text: #166534;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 0; margin: 0; background: var(--bg-color); color: var(--text-main); }
+  .container { max-width: 1300px; margin: 20px auto; background: var(--box-bg); padding: 24px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+  
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; }
+  .header h2 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 8px; }
+  .today-badge { background: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
+  
+  /* Settings Top Bar */
+  .settings-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; background: #f8fafc; padding: 16px; border-radius: 6px; border: 1px solid #e2e8f0; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-weight: 700; font-size: 13px; color: var(--text-sub); }
+  input[type="date"], input[type="time"] { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit; }
+  .date-display-box { font-size: 12px; font-weight: 700; color: var(--primary); background: #eff6ff; padding: 6px 10px; border-radius: 4px; text-align: center; }
+
+  /* Split Editor Layout */
+  .editor-wrapper { display: flex; gap: 20px; height: 420px; margin-bottom: 16px; }
+  .pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .pane-header { font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+  
+  /* 텍스트 영역 공통 스타일 (줄바꿈/정렬 완벽 동기화) */
+  textarea, .highlight-viewer { 
+    flex: 1; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 6px; 
+    box-sizing: border-box; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 13.5px; 
+    line-height: 1.5; resize: none; overflow-y: auto; 
+    white-space: pre-wrap; /* 줄바꿈 유지 */
+    word-break: break-all; /* 넘치는 단어 줄바꿈 */
+    overflow-wrap: break-word;
+  }
+  textarea { background: var(--box-bg); color: var(--text-main); }
+  textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+  .highlight-viewer { background: #fafafa; color: #374151; }
+  
+  /* 형광펜(에러) 스타일 */
+  mark.err-marker { background-color: #fecaca; color: #991b1b; font-weight: bold; border-bottom: 2px solid var(--err-border); padding: 1px 3px; border-radius: 3px; }
+
+  /* Controls */
+  .controls { display: flex; justify-content: center; margin-bottom: 20px; }
+  .btn-submit { padding: 12px 28px; background: var(--primary); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 14px; transition: background-color 0.2s; }
+  .btn-submit:hover { background: var(--primary-hover); }
+
+  /* Compact Results (로그 공간 최적화) */
+  .result-area { border-top: 1px solid #e5e7eb; padding-top: 16px; }
+  .issue { 
+    padding: 8px 12px; 
+    margin-bottom: 6px; 
+    border-radius: 4px; 
+    font-size: 13px; 
+    line-height: 1.4; 
+    display: flex; 
+    align-items: flex-start; 
+    gap: 8px; 
+  }
+  .issue::before { content: '🚨'; flex-shrink: 0; font-size: 12px; margin-top: 1px; }
+  .issue.success::before { content: '✅'; }
+  
+  .error { background: var(--err-bg); border-left: 4px solid var(--err-border); color: var(--err-text); }
+  .success { background: var(--success-bg); border-left: 4px solid var(--success-text); color: var(--success-text); font-weight: bold; }
+  .snippet { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-weight: 700; color: #111; font-size: 12px; }
+</style>
+</head>
+<body onload="initDefaultSchedule()">
+
+<div class="container">
+  <div class="header">
+    <h2>📢 Lynn Chronicle 공지 정합성 자동 검증기</h2>
+    <div id="todayBadge" class="today-badge">계산 중...</div>
+  </div>
+  
+  <div class="settings-grid">
+    <div class="form-group">
+      <label for="pickerDate">📅 점검 예정일 선택</label>
+      <input type="date" id="pickerDate" onchange="onDateSelected()">
+      <div id="selectedDayDisplay" class="date-display-box">--년 --월 --일 (---)</div>
+    </div>
+    <div class="form-group">
+      <label for="pickerStartTime">⏰ 점검 시작 시간</label>
+      <input type="time" id="pickerStartTime" value="11:00">
+    </div>
+    <div class="form-group">
+      <label for="pickerEndTime">⏳ 점검 종료 시간</label>
+      <input type="time" id="pickerEndTime" value="15:00">
+    </div>
+  </div>
+
+  <div class="editor-wrapper">
+    <div class="pane">
+      <div class="pane-header">📝 영문 공지 본문 입력 (수정 가능)</div>
+      <textarea id="noticeInput" placeholder="공지문 본문을 이곳에 붙여넣으세요..."></textarea>
+    </div>
+    <div class="pane">
+      <div class="pane-header">🔍 검증 결과 뷰어 (오류 하이라이트)</div>
+      <div id="highlightedContent" class="highlight-viewer">하단의 [검증 실행] 버튼을 누르면 오류 구간이 이곳에 표시됩니다.</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-submit" onclick="validateNotice()">본문 정합성 종합 검증 실행</button>
+  </div>
+
+  <div class="result-area">
+    <div id="issueList"></div>
+  </div>
+</div>
+
+<script>
+const DAYS_KR = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+const EN_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_MAP = {
+  january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2, april: 3, apr: 3,
+  may: 4, june: 5, jun: 5, july: 6, jul: 6, august: 7, aug: 7, september: 8,
+  sep: 8, sept: 8, october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11
+};
+
+const BASE_MAINT_DATE = new Date(2026, 8, 17);
+
+function initDefaultSchedule() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('todayBadge').innerText = `Today: ${yyyy}-${mm}-${dd} (${DAYS_KR[today.getDay()]})`;
+
+  let targetDate = new Date(BASE_MAINT_DATE);
+  while (targetDate < today) {
+    targetDate.setDate(targetDate.getDate() + 14);
+  }
+  
+  document.getElementById('pickerDate').value = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+  onDateSelected();
+}
+
+function onDateSelected() {
+  const val = document.getElementById('pickerDate').value;
+  if (!val) return;
+  const parts = val.split('-');
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  const date = new Date(y, m - 1, d);
+  document.getElementById('selectedDayDisplay').innerText = `${y}년 ${String(m).padStart(2, '0')}월 ${String(d).padStart(2, '0')}일 (${DAYS_KR[date.getDay()]})`;
+}
+
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return null;
+  const parts = timeStr.split(':');
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function mergeIntervals(intervals) {
+  if (!intervals.length) return [];
+  intervals.sort((a, b) => a.start - b.start);
+  const merged = [intervals[0]];
+  for (let i = 1; i < intervals.length; i++) {
+    const last = merged[merged.length - 1];
+    const curr = intervals[i];
+    if (curr.start <= last.end) {
+      last.end = Math.max(last.end, curr.end);
+    } else {
+      merged.push(curr);
+    }
+  }
+  return merged;
+}
+
+function validateNotice() {
+  const text = document.getElementById('noticeInput').value;
+  const pickerVal = document.getElementById('pickerDate').value;
+  const startVal = document.getElementById('pickerStartTime').value;
+  const endVal = document.getElementById('pickerEndTime').value;
+  
+  const issueListDiv = document.getElementById('issueList');
+  const highlightedContent = document.getElementById('highlightedContent');
+  issueListDiv.innerHTML = '';
+
+  if (!text.trim()) {
+    alert("공지 본문을 입력해주세요.");
+    return;
+  }
+
+  let issues = [];
+  let errorIntervals = [];
+  
+  const addIssue = (start, end, msg) => {
+    errorIntervals.push({ start, end });
+    issues.push(msg);
+  };
+
+  const pParts = pickerVal.split('-');
+  const pYear = parseInt(pParts[0], 10);
+  const pMonth = parseInt(pParts[1], 10) - 1;
+  const pDay = parseInt(pParts[2], 10);
+
+  // 1. 구문/오탈자 패턴
+  const attachedTimeRegex = /(20\d{2})(Time\b)/gi;
+  let match;
+  while ((match = attachedTimeRegex.exec(text)) !== null) {
+    addIssue(match.index, match.index + match[0].length, `[오탈자] 연도(${match[1]})와 'Time' 사이에 띄어쓰기가 누락되었습니다. (<span class="snippet">${match[0]}</span>)`);
+  }
+
+  const commaRegex = /,,/g;
+  while ((match = commaRegex.exec(text)) !== null) {
+    addIssue(match.index, match.index + 2, `[오탈자] 쉼표가 연속(,,)으로 입력되었습니다.`);
+  }
+
+  // 2. 시간 검증
+  const expectedStartMin = parseTimeToMinutes(startVal);
+  const expectedEndMin = parseTimeToMinutes(endVal);
+  const expectedDuration = (expectedEndMin - expectedStartMin) / 60;
+
+  const timeRegex = /(\d{1,2})\s*:\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?\s*(?:~|-|to)\s*(\d{1,2})\s*:\s*(\d{2})\s*(am|pm|a\.m\.|p\.m\.)?(?:[^\n\r]*?\(\s*(?:total:?\s*)?(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\s*\))?/gi;
+  let hasTime = false;
+  
+  while ((match = timeRegex.exec(text)) !== null) {
+    hasTime = true;
+    let sH = parseInt(match[1], 10);
+    const sM = parseInt(match[2], 10);
+    const sAmPm = match[3] ? match[3].toLowerCase().replace(/\./g, '') : null;
+    let eH = parseInt(match[4], 10);
+    const eM = parseInt(match[5], 10);
+    const eAmPm = match[6] ? match[6].toLowerCase().replace(/\./g, '') : null;
+    const statedDuration = match[7] ? parseFloat(match[7]) : null;
+
+    if (sH > 12 && sAmPm) {
+      addIssue(match.index, match.index + match[0].length, `[시간 표기 오류] 24시간제(${sH}시) 표기에는 AM/PM을 혼용할 수 없습니다.`);
+    }
+
+    let normSH = sH;
+    if (sAmPm === 'pm' && normSH < 12) normSH += 12;
+    if (sAmPm === 'am' && normSH === 12) normSH = 0;
+    
+    let normEH = eH;
+    if (eAmPm === 'pm' && normEH < 12) normEH += 12;
+    if (eAmPm === 'am' && normEH === 12) normEH = 0;
+
+    const bodyStartMin = normSH * 60 + sM;
+    const bodyEndMin = normEH * 60 + eM;
+
+    if (expectedStartMin !== null && bodyStartMin !== expectedStartMin) {
+      addIssue(match.index, match.index + match[0].length, `[시작 시간 불일치] 상단 설정(${startVal})과 기재된 시작 시간(<span class="snippet">${match[1]}:${match[2]}</span>)이 다릅니다.`);
+    }
+    if (expectedEndMin !== null && bodyEndMin !== expectedEndMin) {
+      addIssue(match.index, match.index + match[0].length, `[종료 시간 불일치] 상단 설정(${endVal})과 기재된 종료 시간(<span class="snippet">${match[4]}:${match[5]}</span>)이 다릅니다.`);
+    }
+    if (statedDuration !== null && statedDuration !== expectedDuration) {
+      addIssue(match.index, match.index + match[0].length, `[점검 소요시간 오류] 설정된 점검 시간은 <b>${expectedDuration}시간</b>이나, 본문에는 <b>${statedDuration} hours</b>로 잘못 기재되었습니다.`);
+    }
+  }
+  
+  if (!hasTime) {
+    issues.push(`[시간 누락] 본문에서 점검 시간 포맷(예: 11:00 ~ 15:00)을 찾을 수 없습니다.`);
+  }
+
+  // 3. 월/일/연도 검증
+  const dateRegex1 = /(?:(monday|tuesday|wednesday|thursday|friday|saturday|sunday)[,\s]+)?\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?(?:[,\s]+(20\d{2}))?\b/gi;
+  while ((match = dateRegex1.exec(text)) !== null) {
+    const declaredDay = match[1] ? match[1].toLowerCase() : null;
+    const monthStr = match[2].toLowerCase();
+    const day = parseInt(match[3], 10);
+    const year = match[4] ? parseInt(match[4], 10) : pYear;
+    const mIdx = MONTHS_MAP[monthStr];
+    
+    if (declaredDay) {
+      const parsedDate = new Date(year, mIdx, day);
+      const actualDay = EN_DAYS[parsedDate.getDay()];
+      if (declaredDay !== actualDay) {
+         addIssue(match.index, match.index + match[0].length, `[요일 불일치] <span class="snippet">${match[0]}</span> ➔ 실제 요일은 <b>${actualDay.toUpperCase()}</b>입니다.`);
+      }
+    }
+
+    if (year !== pYear || mIdx !== pMonth || day !== pDay) {
+      addIssue(match.index, match.index + match[0].length, `[날짜 불일치] 상단 기준일(${pMonth+1}월 ${pDay}일)과 본문 날짜(<span class="snippet">${match[0]}</span>)가 다릅니다.`);
+    }
+  }
+
+  // 4. 번역기 오역 패턴 (Month 자리에 Weekday)
+  const badTranslationRegex = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(\d{1,2})(?:[,\s]+(20\d{2}))?\b/gi;
+  while ((match = badTranslationRegex.exec(text)) !== null) {
+    const overlap = errorIntervals.some(iv => match.index >= iv.start && match.index < iv.end);
+    if (!overlap) {
+      const dayNum = parseInt(match[2], 10);
+      addIssue(match.index, match.index + match[0].length, `[번역 오류 감지] <span class="snippet">${match[0]}</span> ➔ 월(Month)이 누락되고 요일(${match[1]})이 잘못 들어갔을 확률이 높습니다.`);
+      if (dayNum !== pDay) {
+        addIssue(match.index, match.index + match[0].length, `[일자 불일치] 기재된 일자(${dayNum}일)가 선택일(${pDay}일)과 다릅니다.`);
+      }
+    }
+  }
+
+  // 5. ISO/Slash 날짜 패턴
+  const isoRegex = /\b(20\d{2})[-./](\d{1,2})[-./](\d{1,2})\b/g;
+  while ((match = isoRegex.exec(text)) !== null) {
+    if (parseInt(match[1],10) !== pYear || parseInt(match[2],10) !== (pMonth+1) || parseInt(match[3],10) !== pDay) {
+      addIssue(match.index, match.index + match[0].length, `[날짜 불일치] <span class="snippet">${match[0]}</span>이 선택된 날짜와 일치하지 않습니다.`);
+    }
+  }
+
+  // 렌더링
+  if (issues.length === 0) {
+    issueListDiv.innerHTML = '<div class="issue success">본문 내 모든 날짜, 시간, 요일, 소요 시간 표기가 기준 설정과 완벽히 일치합니다!</div>';
+    highlightedContent.innerHTML = escapeHtml(text);
+  } else {
+    const uniqueIssues = Array.from(new Set(issues));
+    uniqueIssues.forEach(msg => {
+      const div = document.createElement('div');
+      div.className = `issue error`;
+      div.innerHTML = msg;
+      issueListDiv.appendChild(div);
+    });
+
+    const mergedIntervals = mergeIntervals(errorIntervals);
+    let resultHtml = '';
+    let lastIdx = 0;
+
+    mergedIntervals.forEach(interval => {
+      resultHtml += escapeHtml(text.slice(lastIdx, interval.start));
+      resultHtml += `<mark class="err-marker">${escapeHtml(text.slice(interval.start, interval.end))}</mark>`;
+      lastIdx = interval.end;
+    });
+    resultHtml += escapeHtml(text.slice(lastIdx));
+    highlightedContent.innerHTML = resultHtml;
+  }
+}
+</script>
+</body>
+</html>
