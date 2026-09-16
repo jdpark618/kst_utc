@@ -57,6 +57,8 @@
 
         .title-row h1 { margin: 0; font-size: 20px; color: #111827; font-weight: 800; display: flex; align-items: center; gap: 6px; }
         .header-container p { margin: 0; font-size: 13px; color: var(--text-sub); }
+        
+        /* 💡 수정된 부분: white-space: nowrap 추가로 한 줄 강제 유지 */
         .today-badge { 
             background-color: var(--accent); 
             color: white; 
@@ -64,6 +66,7 @@
             border-radius: 20px; 
             font-size: 12px; 
             font-weight: 700; 
+            white-space: nowrap;
         }
         
         .card { 
@@ -395,7 +398,7 @@
             <!-- 2차 검증 버튼 링크 추가 영역 -->
             <div class="verification-area">
                 <a href="https://jdpark618.github.io/kst_utc/check.html" target="_blank" class="btn-verify">
-                    ✅ 영문공지 검증 (날짜/시간 정합성 체크) ↗
+                    ✅ 2차 검증 하러 가기 (날짜/시간 정합성 체크) ↗
                 </a>
             </div>
             
@@ -418,7 +421,9 @@
         const d = String(today.getDate()).padStart(2, '0');
         
         const todayStr = `${y}-${m}-${d}`;
-        document.getElementById('todayDate').innerText = `Today: ${todayStr} (${weekDays[today.getDay()]})`;
+        
+        // 💡 수정된 부분: todayBadge ID로 통일
+        document.getElementById('todayBadge').innerText = `Today: ${todayStr} (${weekDays[today.getDay()]})`;
         document.getElementById('noticeDate').value = todayStr;
 
         const sh = document.getElementById('startHour');
